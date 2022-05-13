@@ -30,6 +30,9 @@
 #include <openssl/rand.h>
 #include "crypto.h"
 
+/* Hack! */
+#include "d3des.h"
+
 static unsigned char reverseByte(unsigned char b) {
    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
    b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
@@ -66,7 +69,7 @@ void random_bytes(void *out, size_t len)
     RAND_bytes(out, len);
 }
 
-int encrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len)
+int encrypt_rfbdes_ignored(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len)
 {
     int result = 0;
     EVP_CIPHER_CTX *des;
@@ -90,7 +93,7 @@ int encrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const vo
     return result;
 }
 
-int decrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len)
+int decrypt_rfbdes_ignored(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len)
 {
     int result = 0;
     EVP_CIPHER_CTX *des;
@@ -112,6 +115,35 @@ int decrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const vo
  out:
     EVP_CIPHER_CTX_free(des);
     return result;
+}
+
+/* Ram this in */
+#include "d3des.c"
+
+int encrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len)
+{
+    int eightbyteblocks = in_len/8;
+    int i;
+    rfbDesKey((unsigned char*)key, EN0);
+    for(i = 0; i < eightbyteblocks; ++i)
+	rfbDes((unsigned char*)in + i*8, (unsigned char*)out + i*8);
+
+    *out_len = in_len;
+
+    return 1;
+}
+
+int decrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len)
+{
+    int eightbyteblocks = in_len/8;
+    int i;
+    rfbDesKey((unsigned char*)key, DE1);
+    for(i = 0; i < eightbyteblocks; ++i)
+	rfbDes((unsigned char*)in + i*8, (unsigned char*)out + i*8);
+
+    *out_len = in_len;
+
+    return 1;
 }
 
 int encrypt_aes128ecb(void *out, int *out_len, const unsigned char key[16], const void *in, const size_t in_len)
